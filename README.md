@@ -1,10 +1,8 @@
-[TOC]
-
 # docker容器配置(踩坑记录)
 
 ## 1.  partner.io
 
-在https://hub.docker.com/r/nvidia/cuda上找到所需要的镜像，我选择的tag是`10.0-cudnn7-devel-ubuntu18.04`。然后打开http://192.168.1.51:9000/#/containers，在左边栏中选择Containers，再点击+Add container。接下来进行container的配置
+在https://hub.docker.com/r/nvidia/cuda 上找到所需要的镜像，我选择的tag是`10.0-cudnn7-devel-ubuntu18.04`。然后打开http://192.168.1.51:9000/#/containers ，在左边栏中选择Containers，再点击+Add container。接下来进行container的配置
 
 <center>
 <img border:0; display:inline; src="1.png" width=70%/>
