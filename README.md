@@ -1,8 +1,8 @@
-# docker容器配置(踩坑记录)
+# docker配置踩坑记录
 
-## 1.  partner.io
+## 1. 方法一：partner.io
 
-在https://hub.docker.com/r/nvidia/cuda 上找到所需要的镜像，我选择的tag是`10.0-cudnn7-devel-ubuntu18.04`。然后打开http://192.168.1.51:9000/#/containers ，在左边栏中选择Containers，再点击+Add container。接下来进行container的配置
+在https://hub.docker.com/r/nvidia/cuda上找到所需要的镜像，我选择的tag是`10.0-cudnn7-devel-ubuntu18.04`。然后打开http://192.168.1.51:9000/#/containers，在左边栏中选择Containers，再点击+Add container。接下来进行container的配置
 
 <center>
 <img border:0; display:inline; src="1.png" width=70%/>
@@ -10,21 +10,61 @@
 
 Name随意填写，Image在前面选的tag前加上nvidia/cuda:，如我的Image应填`nvidia/cuda:10.0-cudnn7-devel-ubuntu18.04`。在Manual network port publishing处点击`+publish a new network port`，并在host中填写`10022`或`10024`或`10026`……(若前一个端口已被占用则依次递推)，映射到container的`22`端口。Entry Point填写`/bin/bash`，Console选择 `Interactive & TTY (-i -t)`。
 
+点选Volumes，在其中添加映射，以下为例:
+
+<center>
+<img border:0; display:inline; src="4.png" width=70%/>
+</center>
+
 在Runtime & Resources中将Runtime选为nvidia，最后点击Deploy the container即可。
 
 最后启动container，打开它的console。
 
 
 
-## 2.  安装并配置SSH
+## 1. 方法二：命令行创建docker
+
+```bash
+docker run -it --name xxx -p 10022:22 -v /media/cita/mydata:/media/mydata:rw --runtime=nvidia --shm-size="4g" pytorch/pytorch:1.4-cuda10.1-cudnn7-devel /bin/bash
+```
+
+
+
+## 2.  更换源、安装并配置SSH
 
 在console中由于是root权限，直接运行以下语句：
 
 ```bash
 apt-get update
-apt-get upgrade
+# apt-get upgrade
 apt-get install vim
-apt-get install openssh-client
+cp /etc/apt/sources.list /etc/apt/sources.list.bak
+vim /etc/apt/sources.list
+```
+
+删除文件中的所有内容，替换为
+
+```bash
+# 默认注释了源码镜像以提高 apt update 速度，如有需要可自行取消注释
+deb https://mirrors.tuna.tsinghua.edu.cn/ubuntu/ bionic main restricted universe multiverse
+# deb-src https://mirrors.tuna.tsinghua.edu.cn/ubuntu/ bionic main restricted universe multiverse
+deb https://mirrors.tuna.tsinghua.edu.cn/ubuntu/ bionic-updates main restricted universe multiverse
+# deb-src https://mirrors.tuna.tsinghua.edu.cn/ubuntu/ bionic-updates main restricted universe multiverse
+deb https://mirrors.tuna.tsinghua.edu.cn/ubuntu/ bionic-backports main restricted universe multiverse
+# deb-src https://mirrors.tuna.tsinghua.edu.cn/ubuntu/ bionic-backports main restricted universe multiverse
+deb https://mirrors.tuna.tsinghua.edu.cn/ubuntu/ bionic-security main restricted universe multiverse
+# deb-src https://mirrors.tuna.tsinghua.edu.cn/ubuntu/ bionic-security main restricted universe multiverse
+
+# 预发布软件源，不建议启用
+# deb https://mirrors.tuna.tsinghua.edu.cn/ubuntu/ bionic-proposed main restricted universe multiverse
+# deb-src https://mirrors.tuna.tsinghua.edu.cn/ubuntu/ bionic-proposed main restricted universe multiverse
+```
+
+接着更新源，安装SSH服务器端
+
+```bash
+apt-get update
+# apt-get install openssh-client
 apt-get install openssh-server
 vim /etc/ssh/sshd_config
 ```
@@ -40,7 +80,8 @@ PermitRootLogin yes
 然后再执行
 
 ```bash
-/etc/init.d/ssh start
+# /etc/init.d/ssh start
+service ssh start
 ```
 
 执行以下语句确认ssh-server是否启动：
@@ -50,8 +91,6 @@ ps -e|grep ssh
 ```
 
 假若看到了sshd那么ssh-server已正常启动。
-
-
 
 
 
@@ -95,22 +134,22 @@ wget https://repo.anaconda.com/archive/Anaconda3-2019.07-Linux-x86_64.sh
 bash Anaconda3-2019.07-Linux-x86_64.sh
 ```
 
-打开profile文件
+~~打开profile文件~~
 
 ``` bash
-sudo vim /etc/profile
+# sudo vim ~/.bashrc
 ```
 
-在文件末尾处添加
+~~在文件末尾处添加~~
 
 ```bash
-export PATH=/home/username/anaconda3/bin:$PATH
+# export PATH=/home/username/anaconda3/bin:$PATH
 ```
 
-回到bash中，执行
+在终端中执行
 
 ```bash
-source /etc/profile
+source ~/.bashrc
 ```
 
 再输入python，出现Anaconda, Inc.则表示成功，也可输入`echo $PATH`查看已有的环境变量。
@@ -132,7 +171,7 @@ sudo vim ~/.bashrc
 ```bash
 export CUDA_HOME=/usr/local/cuda
 export PATH=/usr/local/cuda/bin:$PATH
-export LD_LIBRARY_PATH=/usr/local/cuda/lib64:/usr/local/cuda/extras/CUPTI/lib64:$LD_LIBRARY_PATHs
+export LD_LIBRARY_PATH=/usr/local/cuda/lib64:/usr/local/cuda/extras/CUPTI/lib64:$LD_LIBRARY_PATH
 # export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/username/anaconda3/lib 此句会带来问题，删去
 ```
 
@@ -189,9 +228,9 @@ git config --global user.email "your_email@example.com"
 
 
 
-==接下来是分支配置(非必须)==
+==接下来是分支配置或问题解决方案(非必须)==
 
-### A.  SSH连接github(加快git clone速度)
+### A.  SSH连接github(可能加快git clone速度)
 
 在bash中输入
 
@@ -211,6 +250,7 @@ ssh-add ~/.ssh/id_rsa
 回到bash中，输入以下语句测试连接是否成功：
 
 ```bash
+ssh-agent bash
 ssh -T git@github.com
 ```
 
@@ -267,316 +307,90 @@ source /etc/bash.bashrc
 
 - 如果运行时出现路径前一堆乱码的情况时，打开右上角的Edit Configurations，将Script path调好，注意运行不要再使用Ctrl+Shift+F10，直接Run当前文件，即可正常运行。
 
-- pycharm运行的py文件中matplotlib打印不出图片时，首先要`sudo apt-get install python3-tk`，然后再`sudo vim ~/.bashrc`，在其中加上DISPLAY环境变量:
 
 
+### D.  matplotlib等出图问题
 
+#### Solution 1  安装Xming
 
+#### Solution 2  配置display环境变量
 
-## 4.  框架分支
+该方法主要仅适合使用Mobaxterm作为SSH软件的用户。
 
-接下来是深度学习框架的安装，根据需要安装对应的框架即可，尽量不要同时安装多个。
+具体方法如下：
 
-### I.  配置caffe
+<center>
+<img border:0; display:inline; src="3.png" width=90%/>
+</center>
 
-有两种方法(推荐第二种，第一种中的caffe无法在使用Anaconda3中的python时import)：
+注意右上角红框，将鼠标停在按钮上方可以看到出现Current DISPLAY={Your IPv4 address}:X.Y
 
-1. 直接在终端输入
-
-```bash
-sudo apt-get install caffe-cuda
-```
-
-2. 下载源码进行编译
-
-首先我们要从GitHub的远端下载caffe的源码
+故做以下操作，在bash中执行
 
 ```bash
-git clone git@github.com:BVLC/caffe.git
+sudo vim ~/.bashrc
 ```
 
-如果前文没有配置SSH连接GitHub，那么请使用下面这句替代上一句
+在末尾加上
 
 ```bash
-git clone https://github.com/BVLC/caffe.git
+export DISPLAY={Your IPv4 address}:X.Y
 ```
 
-在bash输入以下语句安装caffe依赖包
+然后使DISPLAY环境变量生效
 
 ```bash
-sudo apt-get install libprotobuf-dev libleveldb-dev libsnappy-dev libopencv-dev
- 
-sudo apt-get install libhdf5-serial-dev protobuf-compiler
- 
-sudo apt-get install --no-install-recommends libboost-all-dev
- 
-sudo apt-get install libopenblas-dev liblapack-dev libatlas-base-dev
- 
-sudo apt-get install libgflags-dev libgoogle-glog-dev liblmdb-dev
+source ~/.bashrc
 ```
 
-把Makefile.config.example复制得Makefile.config，修改成符合系统环境的情况。以如下环境为例
+这时即可正常出图了。
 
-- Ubuntu 18.04 LTS
-- RTX 2080 + Nvidia-Driver 430.40
-- Cuda 10.0 + Cudnn v7.4.2
-- Anaconda3
+==注意:==
 
-给出对应的Makefile.config示例
+1)
 
-```makefile
-## Refer to http://caffe.berkeleyvision.org/installation.html
-# Contributions simplifying and improving our build system are welcome!
+运行py文件时还可能提示`UserWarning: Matplotlib is currently using agg, which is a non-GUI backend, so cannot show the figure`，此时的解决方法是
 
-# cuDNN acceleration switch (uncomment to build with cuDNN).
-USE_CUDNN := 1
-
-# CPU-only switch (uncomment to build without GPU support).
-# CPU_ONLY := 1
-
-# uncomment to disable IO dependencies and corresponding data layers
-# USE_OPENCV := 0
-# USE_LEVELDB := 0
-# USE_LMDB := 0
-# This code is taken from https://github.com/sh1r0/caffe-android-lib
-# USE_HDF5 := 0
-
-# uncomment to allow MDB_NOLOCK when reading LMDB files (only if necessary)
-#	You should not set this flag if you will be reading LMDBs with any
-#	possibility of simultaneous read and write
-# ALLOW_LMDB_NOLOCK := 1
-
-# Uncomment if you're using OpenCV 3
-OPENCV_VERSION := 3
-
-# To customize your choice of compiler, uncomment and set the following.
-# N.B. the default for Linux is g++ and the default for OSX is clang++
-# CUSTOM_CXX := g++
-
-# CUDA directory contains bin/ and lib/ directories that we need.
-CUDA_DIR := /usr/local/cuda
-# On Ubuntu 14.04, if cuda tools are installed via
-# "sudo apt-get install nvidia-cuda-toolkit" then use this instead:
-# CUDA_DIR := /usr
-
-# CUDA architecture setting: going with all of them.
-# For CUDA < 6.0, comment the *_50 through *_61 lines for compatibility.
-# For CUDA < 8.0, comment the *_60 and *_61 lines for compatibility.
-# For CUDA >= 9.0, comment the *_20 and *_21 lines for compatibility.
-CUDA_ARCH := # -gencode arch=compute_20,code=sm_20 \
-		# -gencode arch=compute_20,code=sm_21 \
-		-gencode arch=compute_30,code=sm_30 \
-		-gencode arch=compute_35,code=sm_35 \
-		-gencode arch=compute_50,code=sm_50 \
-		-gencode arch=compute_52,code=sm_52 \
-		-gencode arch=compute_60,code=sm_60 \
-		-gencode arch=compute_61,code=sm_61 \
-		-gencode arch=compute_61,code=compute_61
-
-# BLAS choice:
-# atlas for ATLAS (default)
-# mkl for MKL
-# open for OpenBlas
-# BLAS := atlas
-BLAS := open
-# Custom (MKL/ATLAS/OpenBLAS) include and lib directories.
-# Leave commented to accept the defaults for your choice of BLAS
-# (which should work)!
-# BLAS_INCLUDE := /path/to/your/blas
-# BLAS_LIB := /path/to/your/blas
-
-# Homebrew puts openblas in a directory that is not on the standard search path
-# BLAS_INCLUDE := $(shell brew --prefix openblas)/include
-# BLAS_LIB := $(shell brew --prefix openblas)/lib
-
-# This is required only if you will compile the matlab interface.
-# MATLAB directory should contain the mex binary in /bin.
-# MATLAB_DIR := /usr/local
-# MATLAB_DIR := /Applications/MATLAB_R2012b.app
-
-# NOTE: this is required only if you will compile the python interface.
-# We need to be able to find Python.h and numpy/arrayobject.h.
-# PYTHON_INCLUDE := /usr/include/python2.7 \
-#		/usr/lib/python2.7/dist-packages/numpy/core/include
-# Anaconda Python distribution is quite popular. Include path:
-# Verify anaconda location, sometimes it's in root.
-ANACONDA_HOME := $(HOME)/anaconda3
-PYTHON_INCLUDE := $(ANACONDA_HOME)/include \
-		 $(ANACONDA_HOME)/include/python3.7m \
-		 $(ANACONDA_HOME)/lib/python3.7/site-packages/numpy/core/include
-
-# Uncomment to use Python 3 (default is Python 2)
-PYTHON_LIBRARIES := boost_python3 python3.6m
-# PYTHON_INCLUDE := /usr/include/python3.5m \
-#                 /usr/lib/python3.5/dist-packages/numpy/core/include
-
-# We need to be able to find libpythonX.X.so or .dylib.
-# PYTHON_LIB := /usr/lib
-PYTHON_LIB := $(ANACONDA_HOME)/lib
-
-# Homebrew installs numpy in a non standard path (keg only)
-# PYTHON_INCLUDE += $(dir $(shell python -c 'import numpy.core; print(numpy.core.__file__)'))/include
-# PYTHON_LIB += $(shell brew --prefix numpy)/lib
-
-# Uncomment to support layers written in Python (will link against Python libs)
-WITH_PYTHON_LAYER := 1
-
-# Whatever else you find you need goes here.
-INCLUDE_DIRS := $(PYTHON_INCLUDE) /usr/local/include /usr/include/hdf5/serial
-LIBRARY_DIRS := $(PYTHON_LIB) /usr/local/lib /usr/lib /usr/lib/x86_64-linux-gnu/hdf5/serial
-
-# If Homebrew is installed at a non standard location (for example your home directory) and you use it for general dependencies
-# INCLUDE_DIRS += $(shell brew --prefix)/include
-# LIBRARY_DIRS += $(shell brew --prefix)/lib
-
-# NCCL acceleration switch (uncomment to build with NCCL)
-# https://github.com/NVIDIA/nccl (last tested version: v1.2.3-1+cuda8.0)
-# USE_NCCL := 1
-
-# Uncomment to use `pkg-config` to specify OpenCV library paths.
-# (Usually not necessary -- OpenCV libraries are normally installed in one of the above $LIBRARY_DIRS.)
-# USE_PKG_CONFIG := 1
-
-# N.B. both build and distribute dirs are cleared on `make clean`
-BUILD_DIR := build
-DISTRIBUTE_DIR := distribute
-
-# Uncomment for debugging. Does not work on OSX due to https://github.com/BVLC/caffe/issues/171
-# DEBUG := 1
-
-# The ID of the GPU that 'make runtest' will use to run unit tests.
-TEST_GPUID := 0
-
-# enable pretty build (comment to see full commands)
-Q ?= @
-```
-
-此外还要还需将Makefile==(注意不是Makefile.config)==中的这一行
-
-```makefile
-NVCCFLAGS += -ccbin=$(CXX) -Xcompiler -fPIC $(COMMON_FLAGS)
-```
-
-替换为
-
-```makefile
-NVCCFLAGS += -D_FORCE_INLINES -ccbin=$(CXX) -Xcompiler -fPIC $(COMMON_FLAGS)
-```
-
-最后回到终端，执行以下语句获取caffe的python依赖库
+安装tkinter
 
 ```bash
-cd /home/username/caffe/python
-for req in $(cat requirements.txt); do pip install $req; done
+sudo apt-get install python3-tk
 ```
 
-以下语句目的是回到caffe文件夹下，执行完整个编译过程。
+然后在py文件中`import matplotlib.pyplot as plt`的前面加上
+
+```python
+import matplotlib
+matplotlib.use('tkagg')
+```
+
+
+
+### E.  tensorflow报错问题
+
+若运行时报错提示
+
+`Could not create cudnn handle: CUDNN_STATUS_INTERNAL_ERROR`
+
+则改变文件以下部分
+
+```python
+config = tf.ConfigProto(gpu_options=tf.GPUOptions(allow_growth=True))
+sess = tf.Session(config = config)
+```
+
+
+
+### F. vim永久显示行号
 
 ```bash
-cd ..
-make clean
-make all -j8 # -j8表示调动CPU的8个线程，加快执行该指令的速度
-make pycaffe -j8
-make test -j8
-make runtest -j8
-make distribute
+vim ~/.vimrc
 ```
 
-
-
-#### 分支I  PSPNet
-
-下载Matlab R2015b_glnxa64.iso和Crack文件。
-
-挂载ISO镜像文件
+在打开的文件中最后一行输入
 
 ```bash
-sudo mkdir /media/matlab
-sudo mount -o -loop R2015b_glnxa64.iso /media/matlab
-cd /media/matlab
-sudo ./install
-sudo cp /[Your crack directory]/Matlab_R2015b/Matlab_2015b_Linux64_Crack/R2015b/bin/glnxa64/* /usr/local/MATLAB/R2015b/bin/glnxa64
+set number
 ```
 
-首次运行matlab要用root权限（否则无法写文件），采用不联网激活，找到Crack中相应的激活文件*.lic，导入激活。
-
-```bash
-cd /usr/local/MATLAB/R2015b/bin
-sudo ./matlab
-```
-
-卸载ISO镜像
-
-```bash
-sudo umount /media/matlab
-```
-
-回到PSPNet主目录中，
-
-```bash
-cd ~/PSPNet
-make matcaffe
-make mattest
-```
-
-
-
-#### 分支II  py-faster-rcnn
-
-安装依赖包
-
-```bash
-pip install cython
-pip install easydict
-sudo apt-get install python-opencv
-```
-
-克隆py-faster-rcnn项目
-
-```bash
-git clone --recursive git@github.com:rbgirshick/py-faster-rcnn.git
-```
-
-编译内部模块
-
-```bash
-cd faster-rcnn/lib
-make
-cd ../caffe-fast-rcnn
-cp Makefile.config.example Makefile.config
-```
-
-将Makefile.config配置为符合当前系统环境，后
-
-```bash
-make -j8 && make pycaffe
-```
-
-此时一般会遇到与==cudnn==有关的问题，解决办法是将已编译的新版本caffe中以下三个部分复制覆盖到faster-rcnn自带的caffe中。
-
-```bash
-cp ~/caffe/src/caffe/layers/cudnn* ~/faster-rcnn/caffe-fast-rcnn/src/caffe/layers/
-cp ~/caffe/include/caffe/layers/cudnn* ~/faster-rcnn/caffe-fast-rcnn/include/caffe/layers/
-cp ~/caffe/include/caffe/util/cudnn* ~/faster-rcnn/caffe-fast-rcnn/include/caffe/util/
-```
-
-之后
-
-```bash
-make test -j8
-make runtest -j8
-make distribute
-```
-
-在第一步通常会遇到与==test_smooth_L1_loss_layer.cpp==有关的问题，解决方法为注释掉出问题的include行。
-
-
-
-### II.  配置tensorflow
-
-
-
-### III.  配置pytorch
-
-
-
+以后用vim打开文件都会显示行号了。
